@@ -1,11 +1,9 @@
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
-
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
-
 let lastFrame = null;
 let esp32Client = null;
 const browsers = new Set();
@@ -47,12 +45,9 @@ app.get('/', (req, res) => {
   const ws = new WebSocket('wss://' + location.host);
   const img = document.getElementById('frame');
   const status = document.getElementById('status');
-
   ws.binaryType = 'blob';
-
   ws.onopen = () => { status.textContent = 'Connecte'; };
   ws.onclose = () => { status.textContent = 'Deconnecte'; };
-
   ws.onmessage = e => {
     if (e.data instanceof Blob) {
       const url = URL.createObjectURL(e.data);
@@ -63,7 +58,6 @@ app.get('/', (req, res) => {
       if (e.data === 'OFF') status.textContent = 'Vibreur OFF';
     }
   };
-
   function vibrer(on) {
     if (ws.readyState === WebSocket.OPEN) ws.send(on ? 'START' : 'STOP');
   }
@@ -83,15 +77,23 @@ wss.on('connection', (ws, req) => {
         browsers.forEach(b => {
           if (b.readyState === WebSocket.OPEN) b.send(txt === 'START' ? 'ON' : 'OFF');
         });
-        if (esp32Client && esp32Client.readyState === WebSocket.OPEN) {
-          esp32Client.send(txt);
-        }
       }
     });
     ws.on('close', () => { esp32Client = null; });
+
   } else {
     browsers.add(ws);
     if (lastFrame) ws.send(lastFrame);
+
+    // ✅ CORRECTION : écouter les messages du navigateur et les transmettre à l'ESP32
+    ws.on('message', msg => {
+      const txt = msg.toString();
+      if ((txt === 'START' || txt === 'STOP') && esp32Client
+          && esp32Client.readyState === WebSocket.OPEN) {
+        esp32Client.send(txt);
+      }
+    });
+
     ws.on('close', () => browsers.delete(ws));
   }
 });
