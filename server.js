@@ -30,25 +30,4 @@ app.get('/', (req, res) => {
     body{background:#000;display:flex;flex-direction:column;align-items:center;height:100vh;}
     img{width:100%;max-width:1200px;object-fit:contain;}
     .btns{display:flex;gap:12px;margin:10px;flex-wrap:wrap;justify-content:center;}
-    button{padding:18px 36px;font-size:20px;border-radius:12px;border:none;
-           color:#fff;font-weight:bold;cursor:pointer;
-           touch-action:none;user-select:none;-webkit-user-select:none;}
-    #btnPulse{background:#ff9800;}
-    #status{color:#aaa;font-family:sans-serif;font-size:13px;padding:6px;}
-  </style>
-</head>
-<body>
-  <div id="status">Connexion...</div>
-  <img id="frame">
-  <div class="btns">
-    <button id="btnPulse">Vibration brève</button>
-  </div>
-<script>
-  const ws = new WebSocket('wss://' + location.host);
-  const img = document.getElementById('frame');
-  const status = document.getElementById('status');
-  let blobUrl = null;
-
-  ws.binaryType = 'blob';
-  ws.onopen = () => status.textContent = 'Connecte';
-  ws.onclo
+    button{padding:18px 36px;font-size:20px;border-radius:12px;bord
