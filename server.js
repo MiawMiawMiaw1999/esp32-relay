@@ -1,16 +1,18 @@
 const express = require('express');
 const http = require('http');
 const WebSocket = require('ws');
+
 const app = express();
 const server = http.createServer(app);
 const wss = new WebSocket.Server({ server });
 
 let lastFrame = null;
-let esp32Client = null;
+let esp32Control = null;
 const browsers = new Set();
 
 app.use(express.raw({ type: 'image/jpeg', limit: '5mb' }));
 
+// ── fallback HTTP (garde si besoin) ──────────────────────────
 app.post('/frame', (req, res) => {
   lastFrame = req.body;
   browsers.forEach(ws => {
@@ -19,6 +21,7 @@ app.post('/frame', (req, res) => {
   res.sendStatus(200);
 });
 
+// ── page web ─────────────────────────────────────────────────
 app.get('/', (req, res) => {
   res.send(`<!DOCTYPE html>
 <html>
@@ -50,7 +53,7 @@ app.get('/', (req, res) => {
   let blobUrl = null;
 
   ws.binaryType = 'blob';
-  ws.onopen = () => status.textContent = 'Connecte';
+  ws.onopen  = () => status.textContent = 'Connecte';
   ws.onclose = () => status.textContent = 'Deconnecte';
   ws.onmessage = e => {
     if (e.data instanceof Blob) {
@@ -72,21 +75,40 @@ app.get('/', (req, res) => {
 </html>`);
 });
 
+// ── WebSocket ─────────────────────────────────────────────────
 wss.on('connection', (ws, req) => {
-  if (req.url === '/esp') {
-    esp32Client = ws;
-    ws.on('close', () => { esp32Client = null; });
-  } else {
-    browsers.add(ws);
-    if (lastFrame) ws.send(lastFrame);
-    ws.on('message', msg => {
-      const txt = msg.toString();
-      if (txt === 'PULSE' && esp32Client?.readyState === WebSocket.OPEN) {
-        esp32Client.send(txt);
-      }
+
+  // ESP32 — flux vidéo
+  if (req.url === '/frame-ws') {
+    ws.on('message', data => {
+      lastFrame = data;
+      browsers.forEach(b => {
+        if (b.readyState === WebSocket.OPEN) b.send(data);
+      });
     });
-    ws.on('close', () => browsers.delete(ws));
+    ws.on('close', () => {});
+    return;
   }
+
+  // ESP32 — contrôle vibreur
+  if (req.url === '/esp') {
+    esp32Control = ws;
+    ws.on('close', () => { esp32Control = null; });
+    return;
+  }
+
+  // Browser
+  browsers.add(ws);
+  if (lastFrame) ws.send(lastFrame);
+
+  ws.on('message', msg => {
+    const txt = msg.toString();
+    if (txt === 'PULSE' && esp32Control?.readyState === WebSocket.OPEN) {
+      esp32Control.send(txt);
+    }
+  });
+
+  ws.on('close', () => browsers.delete(ws));
 });
 
 const PORT = process.env.PORT || 3000;
